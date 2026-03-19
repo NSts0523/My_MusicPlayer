@@ -62,10 +62,9 @@
           width: "640",
           videoId: songs[0].videoId,
           playerVars: {
-            autoplay: 0,
-            controls: 1,
-            rel: 0,
+            origin: location.origin, // 自動抓取你的 github.io 網址
             enablejsapi: 1,
+            autoplay: 0,
           },
           events: {
             onReady: onPlayerReady,
