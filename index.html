@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Music Station | 修正穩定版</title>
+    <title>Music Station | 靜態載入版</title>
     <style>
       :root {
         --bg-color: #0f0f0f;
@@ -27,24 +27,23 @@
         width: 95%;
         max-width: 800px;
       }
-      /* 【關鍵修正 1】: 強制設定播放器容器高度與寬度，避免坍塌 */
-      #player-wrapper {
+      .video-container {
         position: relative;
         width: 100%;
-        padding-bottom: 56.25%; /* 16:9 比例 */
-        height: 0;
+        padding-bottom: 56.25%;
         background: #000;
         border-radius: 12px;
         overflow: hidden;
         margin-bottom: 30px;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
       }
+      /* 直接對 iframe 進行樣式控制 */
       #player {
         position: absolute;
         top: 0;
         left: 0;
-        width: 100% !important;
-        height: 100% !important;
+        width: 100%;
+        height: 100%;
+        border: none;
       }
       .playlist {
         background: var(--card-bg);
@@ -61,33 +60,29 @@
         margin: 5px 0;
         border-radius: 8px;
         cursor: pointer;
-        transition: 0.2s;
         border-left: 4px solid transparent;
-      }
-      .song-item:hover {
-        background: #2a2a2a;
       }
       .song-item.active {
         background: #2a2a2a;
         border-left-color: var(--accent-color);
-      }
-      .status {
-        font-size: 0.8em;
-        color: var(--text-dim);
       }
     </style>
   </head>
   <body>
     <div class="container">
       <h1>Music Station</h1>
-      <div id="player-wrapper">
-        <div id="player"></div>
+      <div class="video-container">
+        <iframe
+          id="player"
+          src="https://www.youtube-nocookie.com/embed/B5bQ355FA2o?enablejsapi=1&modestbranding=1&rel=0&iv_load_policy=3"
+          allow="autoplay; encrypted-media"
+          allowfullscreen
+        ></iframe>
       </div>
       <ul class="playlist" id="playlist"></ul>
     </div>
 
     <script>
-      // 1. 全域變數
       window.songs = [
         { title: "響念 Missing", videoId: "B5bQ355FA2o", start: 299 },
         { title: "Moon River", videoId: "B5bQ355FA2o", start: 3338 },
@@ -96,18 +91,9 @@
       window.player = null;
       window.currentSongIndex = 0;
 
-      // 2. 【關鍵修正 2】: 使用更保險的事件掛載方式
+      // 當 API 準備好後，直接綁定到現有的 iframe
       window.onYouTubeIframeAPIReady = function () {
         window.player = new YT.Player("player", {
-          playerVars: {
-            autoplay: 0,
-            controls: 1,
-            rel: 0, //
-            modestbranding: 1, //
-            iv_load_policy: 3, //
-            enablejsapi: 1,
-            widget_referrer: window.location.href, // 輔助 API 確認來源
-          },
           events: {
             onReady: window.onPlayerReady,
             onStateChange: window.onPlayerStateChange,
@@ -117,18 +103,11 @@
 
       window.onPlayerReady = function () {
         window.renderPlaylist();
-        // 先載入第一首
-        window.player.cueVideoById({
-          videoId: window.songs[0].videoId,
-          startSeconds: window.songs[0].start,
-        });
       };
 
       window.onPlayerStateChange = function (event) {
-        if (event.data === YT.PlayerState.ENDED) {
-          window.playNext();
-        }
-        // 廣告跳轉校準
+        if (event.data === YT.PlayerState.ENDED) playNext();
+        // 廣告後校準：如果時間跑掉則強制 seekTo
         if (event.data === YT.PlayerState.PLAYING) {
           const song = window.songs[window.currentSongIndex];
           if (Math.abs(window.player.getCurrentTime() - song.start) > 5) {
@@ -137,27 +116,15 @@
         }
       };
 
-      window.renderPlaylist = function () {
-        const list = document.getElementById("playlist");
-        if (!list) return;
-        list.innerHTML = "";
-        window.songs.forEach((song, index) => {
-          const li = document.createElement("li");
-          li.className = `song-item ${index === window.currentSongIndex ? "active" : ""}`;
-          li.innerHTML = `<div><span class="title">${song.title}</span></div><span class="status">${index === window.currentSongIndex ? "正在播放" : "待播放"}</span>`;
-          li.onclick = () => window.playSong(index);
-          list.appendChild(li);
-        });
-      };
-
       window.playSong = function (index) {
         window.currentSongIndex = index;
         const song = window.songs[index];
-        const videoData = window.player.getVideoData();
-        const currentId = videoData ? videoData.video_id : null;
+        const currentId = window.player.getVideoData()
+          ? window.player.getVideoData().video_id
+          : null;
 
         if (song.videoId === currentId) {
-          // 同影片 SeekTo 策略，避開重新載入廣告
+          // 同影片跳轉優化
           window.player.seekTo(song.start, true);
           window.player.playVideo();
         } else {
@@ -169,13 +136,23 @@
         window.renderPlaylist();
       };
 
+      window.renderPlaylist = function () {
+        const list = document.getElementById("playlist");
+        list.innerHTML = "";
+        window.songs.forEach((song, index) => {
+          const li = document.createElement("li");
+          li.className = `song-item ${index === window.currentSongIndex ? "active" : ""}`;
+          li.innerHTML = `<span>${song.title}</span>`;
+          li.onclick = () => window.playSong(index);
+          list.appendChild(li);
+        });
+      };
+
       window.playNext = function () {
-        if (window.currentSongIndex < window.songs.length - 1) {
+        if (window.currentSongIndex < window.songs.length - 1)
           window.playSong(window.currentSongIndex + 1);
-        }
       };
     </script>
-
     <script src="https://www.youtube-nocookie.com/iframe_api"></script>
   </body>
 </html>
