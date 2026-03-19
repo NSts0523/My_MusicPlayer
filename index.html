@@ -103,31 +103,41 @@
       // 【處理點擊播放】
       window.handleSongClick = function (index) {
         var song = songs[index];
-        var previousIndex = currentSongIndex;
+        var oldVideoId =
+          player && player.getVideoData ? player.getVideoData().video_id : "";
         currentSongIndex = index;
         hasStarted = true;
 
-        // 取得目前播放器正在播的影片 ID (如果有的話)
-        var currentVideoId = "";
-        if (player && player.getVideoData) {
-          currentVideoId = player.getVideoData().video_id;
-        }
-
-        if (song.videoId === currentVideoId) {
-          // 【核心避開廣告邏輯】
-          // 如果是同一個直播檔，直接跳轉秒數，不重新載入播放器
-          console.log("同影片跳轉，避開重新載入廣告...");
+        if (song.videoId === oldVideoId) {
+          // --- 策略 A：同影片 0 廣告跳轉 ---
+          // 使用 seekTo(time, true)，true 代表允許請求伺服器跳轉，這幾乎不觸發廣告
           player.seekTo(song.start, true);
-          player.playVideo(); // 確保它是播放狀態
+          player.playVideo();
         } else {
-          // 如果是不同的影片，才執行 loadVideoById
-          console.log("切換新影片...");
+          // --- 策略 B：換片時的「強制校準」 ---
+          // 換片必有廣告風險，我們用「靜音校準」大法
+          player.mute(); // 先靜音，避免廣告大聲公
           player.loadVideoById({
             videoId: song.videoId,
             startSeconds: song.start,
           });
-        }
 
+          // 設一個定時器，每 500ms 檢查一次，直到廣告結束或跳轉成功
+          var forceCorrection = setInterval(function () {
+            if (player.getPlayerState() === YT.PlayerState.PLAYING) {
+              var now = player.getCurrentTime();
+              if (Math.abs(now - song.start) > 3) {
+                player.seekTo(song.start, true);
+              } else {
+                player.unMute(); // 跳轉精準後才放聲音
+                clearInterval(forceCorrection);
+              }
+            }
+          }, 500);
+          setTimeout(function () {
+            clearInterval(forceCorrection);
+          }, 8000); // 8秒後放棄強制校準
+        }
         window.renderPlaylist();
       };
 
@@ -146,6 +156,8 @@
           height: "360",
           width: "100%",
           playerVars: {
+            widget_referrer: window.location.href, // 告訴 YouTube 這是正式的引用
+            iv_load_policy: 3, // 隱藏影片註解（有時註解會觸發廣告廣告廣告點）
             autoplay: 0,
             controls: 1,
             enablejsapi: 1,
