@@ -131,12 +131,11 @@
           width: "100%", // 適應手機寬度
           videoId: songs[0].videoId,
           playerVars: {
-            autoplay: 0,
-            controls: 1,
-            rel: 0,
+            autoplay: 1, // 自動播放
+            controls: 1, // 顯示控制列（這有助於手動跳過廣告）
+            rel: 0, // 不顯示相關影片
             enablejsapi: 1,
-            iv_load_policy: 3,
-            origin: location.origin, // 解決 GitHub Pages 驗證問題
+            origin: location.origin,
           },
           events: {
             onReady: onPlayerReady,
