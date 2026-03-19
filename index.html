@@ -152,18 +152,23 @@
 
       // 3. 核心功能：自動播放下一首
       function onPlayerStateChange(event) {
-        // 當影片結束 (YT.PlayerState.ENDED = 0)
-        if (event.data === 0) {
-          playNext();
-        }
-      }
+        const song = songs[currentSongIndex];
 
-      function playNext() {
-        currentSongIndex++;
-        if (currentSongIndex < songs.length) {
-          playSong(currentSongIndex);
-        } else {
-          console.log("歌單已播放完畢");
+        // 當使用者按下播放鍵，狀態變為 PLAYING (1) 時
+        if (event.data === YT.PlayerState.PLAYING) {
+          const currentTime = player.getCurrentTime();
+
+          // 檢查目前秒數是否跟目標秒數差太多（例如超過 3 秒）
+          if (Math.abs(currentTime - song.start) > 3) {
+            console.log("偵測到時間偏移，執行手動校準...");
+            player.seekTo(song.start, true);
+          }
+        }
+
+        // 自動下一首邏輯（如果你選了手動播放，這部分可以保留或移除）
+        if (event.data === YT.PlayerState.ENDED) {
+          // 如果你希望播完這首就停下來，這裡就不要呼叫 playNext()
+          console.log("影片結束");
         }
       }
 
@@ -172,38 +177,16 @@
         const song = songs[index];
         currentSongIndex = index;
 
-        // 1. 先嘗試載入
-        player.loadVideoById({
+        console.log(`已選取：${song.title}，準備跳轉至：${song.start}秒`);
+
+        // 使用 cueVideoById 替代 loadVideoById
+        // 這會載入影片縮圖與進度條，但保持暫停狀態
+        player.cueVideoById({
           videoId: song.videoId,
           startSeconds: song.start,
         });
 
-        // 2. 建立一個「死纏爛打」的檢查機制
-        // 每 200 毫秒檢查一次，直到成功跳轉為止
-        let jumpAttempts = 0;
-        const forceJump = setInterval(() => {
-          const state = player.getPlayerState();
-          const currentTime = player.getCurrentTime();
-
-          // 狀態 1 代表正在播放（真正避開了載入中與廣告）
-          if (state === YT.PlayerState.PLAYING) {
-            // 如果目前時間跟目標時間差距超過 2 秒
-            if (Math.abs(currentTime - song.start) > 2) {
-              console.log("強制校準時間點...");
-              player.seekTo(song.start, true);
-            } else {
-              // 已經到達正確位置，停止檢查
-              console.log("校準成功！");
-              clearInterval(forceJump);
-            }
-          }
-
-          // 安全機制：如果檢查了 50 次 (約 10 秒) 還沒成功，就放棄，避免效能問題
-          jumpAttempts++;
-          if (jumpAttempts > 50) clearInterval(forceJump);
-        }, 200);
-
-        updateUI();
+        updateUI(); // 更新歌單的高亮顯示
       }
       // 5. 渲染與更新 UI
       function renderPlaylist() {
