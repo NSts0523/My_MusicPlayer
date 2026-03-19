@@ -102,14 +102,32 @@
 
       // 【處理點擊播放】
       window.handleSongClick = function (index) {
+        var song = songs[index];
+        var previousIndex = currentSongIndex;
         currentSongIndex = index;
         hasStarted = true;
-        var song = songs[index];
 
-        player.loadVideoById({
-          videoId: song.videoId,
-          startSeconds: song.start,
-        });
+        // 取得目前播放器正在播的影片 ID (如果有的話)
+        var currentVideoId = "";
+        if (player && player.getVideoData) {
+          currentVideoId = player.getVideoData().video_id;
+        }
+
+        if (song.videoId === currentVideoId) {
+          // 【核心避開廣告邏輯】
+          // 如果是同一個直播檔，直接跳轉秒數，不重新載入播放器
+          console.log("同影片跳轉，避開重新載入廣告...");
+          player.seekTo(song.start, true);
+          player.playVideo(); // 確保它是播放狀態
+        } else {
+          // 如果是不同的影片，才執行 loadVideoById
+          console.log("切換新影片...");
+          player.loadVideoById({
+            videoId: song.videoId,
+            startSeconds: song.start,
+          });
+        }
+
         window.renderPlaylist();
       };
 
@@ -152,6 +170,17 @@
 
       window.onPlayerStateChange = function (event) {
         if (event.data === YT.PlayerState.PLAYING) {
+          var song = songs[currentSongIndex];
+          // 如果播放中發現時間不對 (誤差超過 3 秒)，強制拉回 start 位置
+          // 這能解決「廣告播完後影片回到 0:00」的問題
+          if (Math.abs(player.getCurrentTime() - song.start) > 5) {
+            player.seekTo(song.start, true);
+          }
+
+          if (!hasStarted) {
+            hasStarted = true;
+            window.renderPlaylist();
+          }
           if (!hasStarted) {
             hasStarted = true;
             window.renderPlaylist();
