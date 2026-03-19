@@ -34,63 +34,48 @@
     prepareSong(0);
   };
 
+  // ... 前方的初始化程式碼保持不變 ...
+
   window.onPlayerStateChange = function (event) {
-    console.log("狀態改變:", event.data);
+    // 當影片真正開始播放時
     if (event.data === YT.PlayerState.PLAYING) {
-      if (!hasStarted) {
-        hasStarted = true;
-        renderPlaylist();
-      }
+      hasStarted = true;
+      renderPlaylist();
     }
+
+    // 當影片結束且處於聽歌模式時，自動下一首
     if (event.data === YT.PlayerState.ENDED && hasStarted) {
       playNext();
     }
   };
 
-  // --- 以下為輔助邏輯 ---
-
-  function renderPlaylist() {
-    const listElement = document.getElementById("playlist");
-    if (!listElement) return;
-    listElement.innerHTML = "";
-    songs.forEach((song, index) => {
-      const li = document.createElement("li");
-      li.className = `song-item ${index === currentSongIndex ? "active" : ""}`;
-      li.innerHTML = `
-                <span>${song.title}</span>
-                <span class="status-tag">${index === currentSongIndex ? (hasStarted ? "播放中" : "已選取") : ""}</span>
-            `;
-      li.onclick = () => handleSongClick(index);
-      listElement.appendChild(li);
-    });
-  }
-
   function handleSongClick(index) {
     currentSongIndex = index;
     const song = songs[index];
-    if (!hasStarted) {
-      player.cueVideoById({ videoId: song.videoId, startSeconds: song.start });
-    } else {
-      player.loadVideoById({ videoId: song.videoId, startSeconds: song.start });
-    }
-    renderPlaylist();
-  }
 
-  function prepareSong(index) {
-    player.cueVideoById({
-      videoId: songs[index].videoId,
-      startSeconds: songs[index].start,
+    // 關鍵：直接 load，不要 cue
+    hasStarted = true;
+    player.loadVideoById({
+      videoId: song.videoId,
+      startSeconds: song.start,
     });
+
+    renderPlaylist();
   }
 
   function playNext() {
     if (currentSongIndex < songs.length - 1) {
       currentSongIndex++;
+      const nextSong = songs[currentSongIndex];
+
+      // 自動下一首也要直接 load
       player.loadVideoById({
-        videoId: songs[currentSongIndex].videoId,
-        startSeconds: songs[currentSongIndex].start,
+        videoId: nextSong.videoId,
+        startSeconds: nextSong.start,
       });
       renderPlaylist();
+    } else {
+      console.log("歌單已播完");
     }
   }
 </script>
