@@ -119,73 +119,109 @@
         { title: "送給你的", videoId: "B5bQ355FA2o", start: 6938, end: 7236 },
       ];
 
-      // 2. 將函式直接掛載到 window，確保 API 絕對找得到
-      window.onYouTubeIframeAPIReady = function () {
-        console.log("API 準備中...");
+      let player;
+      let currentSongIndex = 0;
+
+      // 2. 初始化 YouTube API
+      function onYouTubeIframeAPIReady() {
         player = new YT.Player("player", {
           height: "360",
-          width: "100%",
+          width: "100%", // 適應手機寬度
+          videoId: songs[0].videoId,
           playerVars: {
             autoplay: 0,
             controls: 1,
+            rel: 0,
             enablejsapi: 1,
-            origin: window.location.origin,
+            origin: location.origin, // 解決 GitHub Pages 驗證問題
           },
           events: {
-            onReady: window.onPlayerReady,
-            onStateChange: window.onPlayerStateChange,
+            onReady: onPlayerReady,
+            onStateChange: onPlayerStateChange,
+            onError: onPlayerError,
           },
         });
-      };
+      }
 
-      window.onPlayerReady = function () {
-        console.log("播放器就緒");
-        renderPlaylist();
-        prepareSong(0);
-      };
-
-      // ... 前方的初始化程式碼保持不變 ...
-
-      window.onPlayerStateChange = function (event) {
-        // 當影片真正開始播放時
-        if (event.data === YT.PlayerState.PLAYING) {
-          hasStarted = true;
-          renderPlaylist();
-        }
-
-        // 當影片結束且處於聽歌模式時，自動下一首
-        if (event.data === YT.PlayerState.ENDED && hasStarted) {
-          playNext();
-        }
-      };
-
-      function handleSongClick(index) {
-        currentSongIndex = index;
-        const song = songs[index];
-
-        // 關鍵：直接 load，不要 cue
-        hasStarted = true;
-        player.loadVideoById({
-          videoId: song.videoId,
-          startSeconds: song.start,
-        });
-
+      function onPlayerReady() {
         renderPlaylist();
       }
 
-      function playNext() {
-        if (currentSongIndex < songs.length - 1) {
-          currentSongIndex++;
-          const nextSong = songs[currentSongIndex];
+      // 3. 核心功能：自動播放下一首
+      function onPlayerStateChange(event) {
+        // 當影片結束 (YT.PlayerState.ENDED = 0)
+        if (event.data === 0) {
+          playNext();
+        }
+      }
 
-          // 自動下一首也要直接 load
-          player.loadVideoById({
-            videoId: nextSong.videoId,
-            startSeconds: nextSong.start,
-          });
-          renderPlaylist();
+      function playNext() {
+        currentSongIndex++;
+        if (currentSongIndex < songs.length) {
+          playSong(currentSongIndex);
         } else {
-          console.log("歌單已播完");
+          console.log("歌單已播放完畢");
+        }
+      }
+
+      // 4. 播放指定歌曲
+      function playSong(index) {
+        const song = songs[index];
+        currentSongIndex = index;
+
+        // 取得目前播放器內的影片 ID
+        const currentVideoId = player.getVideoData()
+          ? player.getVideoData().video_id
+          : null;
+
+        if (song.videoId === currentVideoId) {
+          // [關鍵] 同一個直播檔：直接跳轉秒數，不重新載入
+          console.log("同影片跳轉中...");
+          player.seekTo(song.start, true);
+          player.playVideo();
+        } else {
+          // 不同影片：才需要重新載入
+          console.log("切換新影片中...");
+          player.loadVideoById({
+            videoId: song.videoId,
+            startSeconds: song.start,
+          });
+        }
+        updateUI();
+      }
+
+      // 5. 渲染與更新 UI
+      function renderPlaylist() {
+        const listElement = document.getElementById("playlist");
+        listElement.innerHTML = "";
+
+        songs.forEach((song, index) => {
+          const li = document.createElement("li");
+          li.className = `song-item ${index === currentSongIndex ? "active" : ""}`;
+          li.innerHTML = `
+                    <div class="song-info">
+                        <span class="title">${song.title}</span>
+                        <span class="status">${index === currentSongIndex ? "正在播放" : "待播放"}</span>
+                    </div>
+                `;
+          li.onclick = () => playSong(index);
+          listElement.appendChild(li);
+        });
+      }
+
+      function updateUI() {
+        const items = document.querySelectorAll(".song-item");
+        items.forEach((item, index) => {
+          item.className = `song-item ${index === currentSongIndex ? "active" : ""}`;
+          item.querySelector(".status").innerText =
+            index === currentSongIndex ? "正在播放" : "待播放";
+        });
+      }
+
+      function onPlayerError(e) {
+        console.error("播放發生錯誤，代碼：" + e.data);
+        if (e.data == 101 || e.data == 150) {
+          alert("抱歉，此影片因版權或嵌入限制無法播放。");
         }
       }
     </script>
