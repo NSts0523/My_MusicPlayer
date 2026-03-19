@@ -1,112 +1,212 @@
 <!doctype html>
-<html>
+<html lang="zh-TW">
   <head>
     <meta charset="UTF-8" />
-    <title>我的音樂播放器</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>我的音樂播放器 | My Music Station</title>
     <style>
+      :root {
+        --bg-color: #0f0f0f;
+        --card-bg: #1e1e1e;
+        --accent-color: #ff0000;
+        --text-main: #ffffff;
+        --text-dim: #aaaaaa;
+      }
+
       body {
-        font-family: sans-serif;
-        background: #121212;
-        color: white;
-        text-align: center;
-        padding: 20px;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background-color: var(--bg-color);
+        color: var(--text-main);
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-height: 100vh;
       }
-      .playlist {
-        list-style: none;
-        padding: 0;
-        max-width: 500px;
-        margin: 20px auto;
+
+      .container {
+        width: 90%;
+        max-width: 800px;
+        padding: 40px 20px;
       }
-      .song-item {
-        cursor: pointer;
-        padding: 15px;
-        border-bottom: 1px solid #333;
-        transition: 0.3s;
+
+      h1 {
+        font-weight: 300;
+        letter-spacing: 2px;
+        margin-bottom: 30px;
       }
-      .song-item:hover {
-        background: #222;
-        color: #ff0000;
-      }
-      #player-container {
-        margin-bottom: 20px;
+
+      /* 播放器容器：隱藏但保持運作 */
+      #player-wrapper {
         background: #000;
-        display: inline-block;
+        border-radius: 12px;
+        overflow: hidden;
+        margin-bottom: 30px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        /* 如果你想完全像背景音樂，可以取消註解下面這行 */
+        /* display: none; */
+      }
+
+      /* 歌單樣式 */
+      .playlist {
+        background: var(--card-bg);
+        border-radius: 12px;
+        padding: 10px;
+        list-style: none;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+      }
+
+      .song-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 15px 20px;
+        margin: 5px 0;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border-left: 4px solid transparent;
+      }
+
+      .song-item:hover {
+        background: #2a2a2a;
+        transform: translateX(5px);
+      }
+
+      .song-item.active {
+        background: #2a2a2a;
+        border-left-color: var(--accent-color);
+      }
+
+      .song-info .title {
+        display: block;
+        font-size: 1.1em;
+      }
+      .song-info .status {
+        font-size: 0.8em;
+        color: var(--text-dim);
+      }
+
+      .controls-hint {
+        margin-top: 20px;
+        color: var(--text-dim);
+        font-size: 0.9em;
       }
     </style>
   </head>
   <body>
-    <h2>音樂播放器 (YouTube API)</h2>
+    <div class="container">
+      <h1>Music Station</h1>
 
-    <div id="player-container">
-      <div id="player"></div>
+      <div id="player-wrapper">
+        <div id="player"></div>
+      </div>
+
+      <ul class="playlist" id="playlist"></ul>
+
+      <div class="controls-hint">
+        提示：點擊歌曲即可切換。支援自動播放下一首。
+      </div>
     </div>
 
-    <ul class="playlist" id="playlist"></ul>
-
     <script>
+      // 1. 你的歌單資料
       const songs = [
-        {
-          title: "第一首歌曲",
-          videoId: "SXZ29NGaFFMA", // 確保這個 ID 是有效的
-          start: 0,
-        },
+        { title: "測試歌曲 1 - Rick Roll", videoId: "dQw4w9WgXcQ", start: 0 },
+        // { title: "測試歌曲 2 - Lofi Hip Hop", videoId: "jfKfPfyJRdk", start: 60 },
+        // { title: "測試歌曲 3 - 你的自訂影片", videoId: "uWe-unELeYw", start: 10 }
       ];
 
       let player;
+      let currentSongIndex = 0;
 
-      // 當 API 準備好時會自動執行
+      // 2. 初始化 YouTube API
       function onYouTubeIframeAPIReady() {
-        console.log("YouTube API Ready");
         player = new YT.Player("player", {
           height: "360",
-          width: "640",
+          width: "100%", // 適應手機寬度
           videoId: songs[0].videoId,
           playerVars: {
-            origin: location.origin, // 自動抓取你的 github.io 網址
-            enablejsapi: 1,
             autoplay: 0,
+            controls: 1,
+            rel: 0,
+            enablejsapi: 1,
+            origin: location.origin, // 解決 GitHub Pages 驗證問題
           },
           events: {
             onReady: onPlayerReady,
+            onStateChange: onPlayerStateChange,
             onError: onPlayerError,
           },
         });
       }
 
-      function onPlayerReady(event) {
-        console.log("Player is Ready");
+      function onPlayerReady() {
         renderPlaylist();
       }
 
-      function onPlayerError(event) {
-        const errorMap = {
-          2: "無效的參數",
-          5: "HTML5 播放器錯誤",
-          100: "影片不存在或已設為私人",
-          101: "此影片不允許嵌入播放",
-          150: "此影片不允許嵌入播放",
-        };
-        alert("播放器錯誤: " + (errorMap[event.data] || "未知錯誤"));
+      // 3. 核心功能：自動播放下一首
+      function onPlayerStateChange(event) {
+        // 當影片結束 (YT.PlayerState.ENDED = 0)
+        if (event.data === 0) {
+          playNext();
+        }
       }
 
+      function playNext() {
+        currentSongIndex++;
+        if (currentSongIndex < songs.length) {
+          playSong(currentSongIndex);
+        } else {
+          console.log("歌單已播放完畢");
+        }
+      }
+
+      // 4. 播放指定歌曲
+      function playSong(index) {
+        currentSongIndex = index;
+        const song = songs[index];
+
+        player.loadVideoById({
+          videoId: song.videoId,
+          startSeconds: song.start,
+        });
+
+        updateUI();
+      }
+
+      // 5. 渲染與更新 UI
       function renderPlaylist() {
         const listElement = document.getElementById("playlist");
-        listElement.innerHTML = ""; // 清空舊內容
-        songs.forEach((song) => {
+        listElement.innerHTML = "";
+
+        songs.forEach((song, index) => {
           const li = document.createElement("li");
-          li.className = "song-item";
-          li.innerText = song.title;
-          li.onclick = () => playSong(song);
+          li.className = `song-item ${index === currentSongIndex ? "active" : ""}`;
+          li.innerHTML = `
+                    <div class="song-info">
+                        <span class="title">${song.title}</span>
+                        <span class="status">${index === currentSongIndex ? "正在播放" : "待播放"}</span>
+                    </div>
+                `;
+          li.onclick = () => playSong(index);
           listElement.appendChild(li);
         });
       }
 
-      function playSong(song) {
-        if (player && player.loadVideoById) {
-          player.loadVideoById({
-            videoId: song.videoId,
-            startSeconds: song.start,
-          });
+      function updateUI() {
+        const items = document.querySelectorAll(".song-item");
+        items.forEach((item, index) => {
+          item.className = `song-item ${index === currentSongIndex ? "active" : ""}`;
+          item.querySelector(".status").innerText =
+            index === currentSongIndex ? "正在播放" : "待播放";
+        });
+      }
+
+      function onPlayerError(e) {
+        console.error("播放發生錯誤，代碼：" + e.data);
+        if (e.data == 101 || e.data == 150) {
+          alert("抱歉，此影片因版權或嵌入限制無法播放。");
         }
       }
     </script>
