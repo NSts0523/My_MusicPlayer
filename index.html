@@ -168,14 +168,22 @@
 
       // 4. 播放指定歌曲
       function playSong(index) {
+        const nextSong = songs[index];
+        const currentVideoId = player.getVideoData().video_id;
+
+        // 如果是同一個直播檔，直接跳轉時間（避開重新加載廣告）
+        if (nextSong.videoId === currentVideoId) {
+          player.seekTo(nextSong.start, true);
+          player.playVideo();
+        } else {
+          // 如果是不同影片，才執行重新載入
+          player.loadVideoById({
+            videoId: nextSong.videoId,
+            startSeconds: nextSong.start,
+          });
+        }
+
         currentSongIndex = index;
-        const song = songs[index];
-
-        player.loadVideoById({
-          videoId: song.videoId,
-          startSeconds: song.start,
-        });
-
         updateUI();
       }
 
