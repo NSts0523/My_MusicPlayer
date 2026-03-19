@@ -124,28 +124,7 @@
 
       let player;
       let currentSongIndex = 0;
-      let progressTimer; // 用來存放計時器
 
-      function startProgessTimer() {
-        // 每次切換歌曲前先清除舊的計時器，避免重複執行
-        if (progressTimer) clearInterval(progressTimer);
-
-        progressTimer = setInterval(() => {
-          if (player && player.getCurrentTime) {
-            const currentTime = player.getCurrentTime();
-            const currentSong = songs[currentSongIndex];
-
-            if (player.getPlayerState() === YT.PlayerState.PLAYING) {
-              // 只有在真正播放音樂時才檢查時間，避免廣告時間誤判
-            }
-            // 檢查是否設定了結束時間，且目前時間是否已超過結束時間
-            if (currentSong.end && currentTime >= currentSong.end) {
-              console.log("偵測到歌曲結束，準備跳轉下一首...");
-              playNext();
-            }
-          }
-        }, 1000); // 每 1000 毫秒 (1秒) 檢查一次
-      }
       // 2. 初始化 YouTube API
       function onYouTubeIframeAPIReady() {
         player = new YT.Player("player", {
@@ -210,26 +189,6 @@
             videoId: song.videoId,
             startSeconds: song.start,
           });
-        }
-        player.loadVideoById({
-          videoId: songs[index].videoId,
-          startSeconds: songs[index].start,
-        });
-
-        currentSongIndex = index;
-        updateUI();
-
-        // [重點] 啟動偵測邏輯
-        startProgessTimer();
-      }
-
-      // 修正 playNext 避免超出歌單範圍
-      function playNext() {
-        if (currentSongIndex < songs.length - 1) {
-          playSong(currentSongIndex + 1);
-        } else {
-          console.log("已到歌單末尾");
-          clearInterval(progressTimer); // 停止偵測
         }
         updateUI();
       }
