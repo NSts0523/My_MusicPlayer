@@ -112,12 +112,12 @@
     <script>
       // 1. 你的歌單資料
       const songs = [
-        { title: "響念 Missing", videoId: "B5bQ355FA2o", start: 299 },
-        { title: "Moon River", videoId: "B5bQ355FA2o", start: 3338 },
+        { title: "響念 Missing", videoId: "B5bQ355FA2o", start: 299, end: 507 },
+        { title: "Moon River", videoId: "B5bQ355FA2o", start: 3338, end: 3550 },
         {
           title: "送給你的",
           videoId: "B5bQ355FA2o",
-          start: 6938,
+          start: 7236,
         },
       ];
 
@@ -168,25 +168,29 @@
 
       // 4. 播放指定歌曲
       function playSong(index) {
-        const nextSong = songs[index];
-        const currentVideoId = player.getVideoData().video_id;
+        const song = songs[index];
+        currentSongIndex = index;
 
-        // 如果是同一個直播檔，直接跳轉時間（避開重新加載廣告）
-        if (nextSong.videoId === currentVideoId) {
-          player.seekTo(nextSong.start, true);
+        // 取得目前播放器內的影片 ID
+        const currentVideoId = player.getVideoData()
+          ? player.getVideoData().video_id
+          : null;
+
+        if (song.videoId === currentVideoId) {
+          // [關鍵] 同一個直播檔：直接跳轉秒數，不重新載入
+          console.log("同影片跳轉中...");
+          player.seekTo(song.start, true);
           player.playVideo();
         } else {
-          // 如果是不同影片，才執行重新載入
+          // 不同影片：才需要重新載入
+          console.log("切換新影片中...");
           player.loadVideoById({
-            videoId: nextSong.videoId,
-            startSeconds: nextSong.start,
+            videoId: song.videoId,
+            startSeconds: song.start,
           });
         }
-
-        currentSongIndex = index;
         updateUI();
       }
-
       // 5. 渲染與更新 UI
       function renderPlaylist() {
         const listElement = document.getElementById("playlist");
