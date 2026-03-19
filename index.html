@@ -125,7 +125,7 @@
         player = new YT.Player("player", {
           height: "360",
           width: "100%", // 適應手機寬度
-          videoId: songs[0].videoId,
+          // videoId: songs[0].videoId,
           playerVars: {
             autoplay: 0,
             controls: 1,
@@ -143,12 +143,27 @@
 
       function onPlayerReady() {
         renderPlaylist();
+        player.cueVideoById({
+          videoId: songs[0].videoId,
+          startSeconds: songs[0].start,
+        });
       }
 
       // 3. 核心功能：自動播放下一首
       function onPlayerStateChange(event) {
-        // 當影片結束 (YT.PlayerState.ENDED = 0)
-        if (event.data === 0) {
+        if (event.data === YT.PlayerState.PLAYING) {
+          const song = songs[currentSongIndex];
+          const currentTime = player.getCurrentTime();
+
+          // 如果發現現在的時間點跟我們要聽的差太多 (超過 5 秒誤差)
+          // 通常是廣告播完後影片想跑回 0:00，我們強行把它拉回來
+          if (Math.abs(currentTime - song.start) > 5) {
+            console.log("偵測到時間偏移，強制校準中...");
+            player.seekTo(song.start, true);
+          }
+        }
+
+        if (event.data === YT.PlayerState.ENDED) {
           playNext();
         }
       }
