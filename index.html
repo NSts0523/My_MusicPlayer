@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>我的音樂播放器 | 極簡低廣告版</title>
+    <title>我的音樂播放器 | 極致穩定版</title>
     <style>
       :root {
         --bg-color: #0f0f0f;
@@ -13,7 +13,7 @@
         --text-dim: #aaaaaa;
       }
       body {
-        font-family: sans-serif;
+        font-family: "Segoe UI", sans-serif;
         background-color: var(--bg-color);
         color: var(--text-main);
         margin: 0;
@@ -33,12 +33,14 @@
         overflow: hidden;
         margin-bottom: 30px;
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        min-height: 360px;
       }
       .playlist {
         background: var(--card-bg);
         border-radius: 12px;
         padding: 10px;
         list-style: none;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
       }
       .song-item {
         display: flex;
@@ -48,11 +50,12 @@
         margin: 5px 0;
         border-radius: 8px;
         cursor: pointer;
-        transition: 0.2s;
+        transition: all 0.2s ease;
         border-left: 4px solid transparent;
       }
       .song-item:hover {
         background: #2a2a2a;
+        transform: translateX(5px);
       }
       .song-item.active {
         background: #2a2a2a;
@@ -67,11 +70,14 @@
   <body>
     <div class="container">
       <h1>Music Station</h1>
-      <div id="player-wrapper"><div id="player"></div></div>
+      <div id="player-wrapper">
+        <div id="player"></div>
+      </div>
       <ul class="playlist" id="playlist"></ul>
     </div>
 
     <script>
+      // 1. 歌單資料
       const songs = [
         { title: "響念 Missing", videoId: "B5bQ355FA2o", start: 299 },
         { title: "Moon River", videoId: "B5bQ355FA2o", start: 3338 },
@@ -81,106 +87,101 @@
       let player;
       let currentSongIndex = 0;
 
-      // 【關鍵優化 1】: 使用載入 YouTube API 的無 Cookie 版本
-      var tag = document.createElement("script");
-      tag.src = "https://www.youtube-nocookie.com/iframe_api";
-      var firstScriptTag = document.getElementsByTagName("script")[0];
-      firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-
-      function onYouTubeIframeAPIReady() {
+      // 2. 【核心優化】: 將 API 事件強制掛載到 window，防止 ReferenceError
+      window.onYouTubeIframeAPIReady = function () {
         player = new YT.Player("player", {
           height: "360",
           width: "100%",
-          // 初始化不設定影片，避免一進網頁就觸發廣告
           playerVars: {
             autoplay: 0,
             controls: 1,
-            rel: 0, // 【關鍵優化 2】: 隱藏相關影片
-            modestbranding: 1, // 【關鍵優化 3】: 隱藏 Logo
-            iv_load_policy: 3, // 【關鍵優化 4】: 隱藏註解
+            rel: 0, // 不顯示相關影片
+            modestbranding: 1, // 隱藏標誌
+            iv_load_policy: 3, // 隱藏註解
             enablejsapi: 1,
             origin: window.location.origin,
           },
           events: {
-            onReady: onPlayerReady,
-            onStateChange: onPlayerStateChange,
+            onReady: window.onPlayerReady,
+            onStateChange: window.onPlayerStateChange,
           },
         });
-      }
+      };
 
-      function onPlayerReady() {
+      window.onPlayerReady = function () {
         renderPlaylist();
-        // 使用 cue 而非 load，能有效降低廣告加載優先權
+        // 初始預備影片但不載入廣告
         player.cueVideoById({
           videoId: songs[0].videoId,
           startSeconds: songs[0].start,
         });
-      }
+      };
 
-      function onPlayerStateChange(event) {
-        // 自動播放下一首邏輯
-        if (event.data === YT.PlayerState.ENDED) {
-          playNext();
-        }
-        // 偵測廣告後的自動回位
+      window.onPlayerStateChange = function (event) {
+        const song = songs[currentSongIndex];
+        // 偵測播放狀態：若廣告結束後時間偏移，強制校準
         if (event.data === YT.PlayerState.PLAYING) {
-          const song = songs[currentSongIndex];
           if (Math.abs(player.getCurrentTime() - song.start) > 5) {
             player.seekTo(song.start, true);
           }
         }
-      }
+        // 自動播放下一首
+        if (event.data === YT.PlayerState.ENDED) {
+          playNext();
+        }
+      };
 
+      // 3. 【核心優化】: 同影片則跳轉 (Seek)，不重新載入影片 (Load)
       function playSong(index) {
         const song = songs[index];
         currentSongIndex = index;
-
-        // 【關鍵優化 5】: 同影片強制跳轉，絕對不執行重新載入
         const currentVideoId = player.getVideoData()
           ? player.getVideoData().video_id
           : null;
 
         if (song.videoId === currentVideoId) {
-          console.log("偵測到同影片，執行無廣告跳轉");
+          console.log("執行 SeekTo 優化，避開載入廣告");
           player.seekTo(song.start, true);
           player.playVideo();
         } else {
-          console.log("切換不同影片");
+          console.log("切換新影片");
           player.loadVideoById({
             videoId: song.videoId,
             startSeconds: song.start,
           });
         }
-        updateUI();
+        renderPlaylist();
       }
 
       function playNext() {
-        currentSongIndex++;
-        if (currentSongIndex < songs.length) {
-          playSong(currentSongIndex);
+        if (currentSongIndex < songs.length - 1) {
+          playSong(currentSongIndex + 1);
         }
       }
 
       function renderPlaylist() {
         const listElement = document.getElementById("playlist");
+        if (!listElement) return;
         listElement.innerHTML = "";
         songs.forEach((song, index) => {
           const li = document.createElement("li");
           li.className = `song-item ${index === currentSongIndex ? "active" : ""}`;
-          li.innerHTML = `<div class="song-info"><span class="title">${song.title}</span><span class="status">${index === currentSongIndex ? "正在播放" : "待播放"}</span></div>`;
+          li.innerHTML = `
+                    <div class="song-info">
+                        <span class="title">${song.title}</span>
+                        <span class="status">${index === currentSongIndex ? "正在播放" : "待播放"}</span>
+                    </div>
+                `;
           li.onclick = () => playSong(index);
           listElement.appendChild(li);
         });
       }
 
-      function updateUI() {
-        const items = document.querySelectorAll(".song-item");
-        items.forEach((item, index) => {
-          item.className = `song-item ${index === currentSongIndex ? "active" : ""}`;
-          item.querySelector(".status").innerText =
-            index === currentSongIndex ? "正在播放" : "待播放";
-        });
-      }
+      // 4. 【核心優化】: 使用無 Cookie 網域 API
+      var tag = document.createElement("script");
+      tag.src = "https://www.youtube-nocookie.com/iframe_api";
+      var firstScriptTag = document.getElementsByTagName("script")[0];
+      firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
     </script>
   </body>
 </html>
