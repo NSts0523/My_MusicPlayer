@@ -1,171 +1,98 @@
-<!doctype html>
-<html lang="zh-TW">
-  <head>
-    <meta charset="UTF-8" />
-    <title>我的音樂播放器</title>
-    <style>
-      body {
-        font-family: sans-serif;
-        background: #121212;
-        color: white;
-        text-align: center;
-        padding: 20px;
-      }
-      .playlist {
-        list-style: none;
-        padding: 0;
-        max-width: 500px;
-        margin: 20px auto;
-        text-align: left;
-      }
-      .song-item {
-        cursor: pointer;
-        padding: 15px;
-        border-bottom: 1px solid #333;
-        transition: 0.3s;
-        display: flex;
-        justify-content: space-between;
-      }
-      .song-item:hover {
-        background: #222;
-        color: #ff0000;
-      }
-      .song-item.active {
-        border-left: 4px solid #ff0000;
-        background: #1a1a1a;
-      }
-      #player-container {
-        margin-bottom: 20px;
-        background: #000;
-        display: inline-block;
-        min-height: 360px;
-        width: 100%;
-        max-width: 640px;
-      }
-      .status-tag {
-        font-size: 0.8em;
-        color: #888;
-      }
-    </style>
-  </head>
-  <body>
-    <h2>音樂播放器 (手動選取模式)</h2>
+<script>
+  // 1. 先宣告變數
+  var player;
+  var currentSongIndex = 0;
+  var hasStarted = false;
+  const songs = [
+    { title: "響念 Missing", videoId: "B5bQ355FA2o", start: 299, end: 507 },
+    { title: "Moon River", videoId: "B5bQ355FA2o", start: 3338, end: 3550 },
+    { title: "送給你的", videoId: "B5bQ355FA2o", start: 6938, end: 7236 },
+  ];
 
-    <div id="player-container">
-      <div id="player"></div>
-    </div>
+  // 2. 將函式直接掛載到 window，確保 API 絕對找得到
+  window.onYouTubeIframeAPIReady = function () {
+    console.log("API 準備中...");
+    player = new YT.Player("player", {
+      height: "360",
+      width: "100%",
+      playerVars: {
+        autoplay: 0,
+        controls: 1,
+        enablejsapi: 1,
+        origin: window.location.origin,
+      },
+      events: {
+        onReady: window.onPlayerReady,
+        onStateChange: window.onPlayerStateChange,
+      },
+    });
+  };
 
-    <ul class="playlist" id="playlist"></ul>
+  window.onPlayerReady = function () {
+    console.log("播放器就緒");
+    renderPlaylist();
+    prepareSong(0);
+  };
 
-    <script>
-      const songs = [
-        { title: "響念 Missing", videoId: "B5bQ355FA2o", start: 299, end: 507 },
-        { title: "Moon River", videoId: "B5bQ355FA2o", start: 3338, end: 3550 },
-        { title: "送給你的", videoId: "B5bQ355FA2o", start: 6938, end: 7236 },
-      ];
-
-      let player;
-      let currentSongIndex = 0;
-      let hasStarted = false; // 關鍵：記錄是否已開始播放
-
-      // 1. 初始化播放器 (不設預設影片以防自播)
-      function onYouTubeIframeAPIReady() {
-        player = new YT.Player("player", {
-          height: "360",
-          width: "100%",
-          playerVars: {
-            autoplay: 0,
-            controls: 1,
-            enablejsapi: 1,
-            origin: window.location.origin,
-          },
-          events: {
-            onReady: onPlayerReady,
-            onStateChange: onPlayerStateChange,
-          },
-        });
+  window.onPlayerStateChange = function (event) {
+    console.log("狀態改變:", event.data);
+    if (event.data === YT.PlayerState.PLAYING) {
+      if (!hasStarted) {
+        hasStarted = true;
+        renderPlaylist();
       }
+    }
+    if (event.data === YT.PlayerState.ENDED && hasStarted) {
+      playNext();
+    }
+  };
 
-      // 2. 當播放器準備好時，渲染歌單並「預備」第一首歌
-      function onPlayerReady() {
-        console.log("播放器就緒");
-        renderPlaylist(); // 確保這裡有呼叫，歌單才會出現
-        prepareSong(0); // 預備第一首歌
-      }
+  // --- 以下為輔助邏輯 ---
 
-      // 3. 渲染歌單函式
-      function renderPlaylist() {
-        const listElement = document.getElementById("playlist");
-        listElement.innerHTML = ""; // 先清空
-        songs.forEach((song, index) => {
-          const li = document.createElement("li");
-          li.className = `song-item ${index === currentSongIndex ? "active" : ""}`;
-          li.innerHTML = `
-                    <span>${song.title}</span>
-                    <span class="status-tag">${index === currentSongIndex ? (hasStarted ? "播放中" : "已選取") : ""}</span>
-                `;
-          li.onclick = () => handleSongClick(index);
-          listElement.appendChild(li);
-        });
-      }
+  function renderPlaylist() {
+    const listElement = document.getElementById("playlist");
+    if (!listElement) return;
+    listElement.innerHTML = "";
+    songs.forEach((song, index) => {
+      const li = document.createElement("li");
+      li.className = `song-item ${index === currentSongIndex ? "active" : ""}`;
+      li.innerHTML = `
+                <span>${song.title}</span>
+                <span class="status-tag">${index === currentSongIndex ? (hasStarted ? "播放中" : "已選取") : ""}</span>
+            `;
+      li.onclick = () => handleSongClick(index);
+      listElement.appendChild(li);
+    });
+  }
 
-      // 4. 處理點擊邏輯：判斷是「預備」還是「直接播」
-      function handleSongClick(index) {
-        currentSongIndex = index;
-        const song = songs[index];
+  function handleSongClick(index) {
+    currentSongIndex = index;
+    const song = songs[index];
+    if (!hasStarted) {
+      player.cueVideoById({ videoId: song.videoId, startSeconds: song.start });
+    } else {
+      player.loadVideoById({ videoId: song.videoId, startSeconds: song.start });
+    }
+    renderPlaylist();
+  }
 
-        if (!hasStarted) {
-          // 還沒開始聽：僅預備 (Cue)
-          player.cueVideoById({
-            videoId: song.videoId,
-            startSeconds: song.start,
-          });
-        } else {
-          // 已經在聽了：直接載入並播放 (Load)
-          player.loadVideoById({
-            videoId: song.videoId,
-            startSeconds: song.start,
-          });
-        }
-        renderPlaylist(); // 更新高亮狀態
-      }
+  function prepareSong(index) {
+    player.cueVideoById({
+      videoId: songs[index].videoId,
+      startSeconds: songs[index].start,
+    });
+  }
 
-      function prepareSong(index) {
-        player.cueVideoById({
-          videoId: songs[index].videoId,
-          startSeconds: songs[index].start,
-        });
-      }
+  function playNext() {
+    if (currentSongIndex < songs.length - 1) {
+      currentSongIndex++;
+      player.loadVideoById({
+        videoId: songs[currentSongIndex].videoId,
+        startSeconds: songs[currentSongIndex].start,
+      });
+      renderPlaylist();
+    }
+  }
+</script>
 
-      // 5. 狀態監聽
-      function onPlayerStateChange(event) {
-        // 一旦使用者手動按下播放，標記為已開始
-        if (event.data === YT.PlayerState.PLAYING) {
-          if (!hasStarted) {
-            hasStarted = true;
-            renderPlaylist(); // 更新標籤為「播放中」
-          }
-        }
-
-        // 自動播放下一首邏輯：只有在 hasStarted 為 true 時才自動連播
-        if (event.data === YT.PlayerState.ENDED && hasStarted) {
-          playNext();
-        }
-      }
-
-      function playNext() {
-        if (currentSongIndex < songs.length - 1) {
-          currentSongIndex++;
-          const nextSong = songs[currentSongIndex];
-          player.loadVideoById({
-            videoId: nextSong.videoId,
-            startSeconds: nextSong.start,
-          });
-          renderPlaylist();
-        }
-      }
-    </script>
-
-    <script src="https://www.youtube.com/iframe_api"></script>
-  </body>
-</html>
+<script src="https://www.youtube.com/iframe_api"></script>
