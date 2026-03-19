@@ -135,6 +135,9 @@
             const currentTime = player.getCurrentTime();
             const currentSong = songs[currentSongIndex];
 
+            if (player.getPlayerState() === YT.PlayerState.PLAYING) {
+              // 只有在真正播放音樂時才檢查時間，避免廣告時間誤判
+            }
             // 檢查是否設定了結束時間，且目前時間是否已超過結束時間
             if (currentSong.end && currentTime >= currentSong.end) {
               console.log("偵測到歌曲結束，準備跳轉下一首...");
