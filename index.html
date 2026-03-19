@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>我的音樂播放器 | My Music Station</title>
+    <title>我的音樂播放器 | 極簡低廣告版</title>
     <style>
       :root {
         --bg-color: #0f0f0f;
@@ -12,9 +12,8 @@
         --text-main: #ffffff;
         --text-dim: #aaaaaa;
       }
-
       body {
-        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        font-family: sans-serif;
         background-color: var(--bg-color);
         color: var(--text-main);
         margin: 0;
@@ -23,39 +22,24 @@
         align-items: center;
         min-height: 100vh;
       }
-
       .container {
         width: 90%;
         max-width: 800px;
         padding: 40px 20px;
       }
-
-      h1 {
-        font-weight: 300;
-        letter-spacing: 2px;
-        margin-bottom: 30px;
-      }
-
-      /* 播放器容器：隱藏但保持運作 */
       #player-wrapper {
         background: #000;
         border-radius: 12px;
         overflow: hidden;
         margin-bottom: 30px;
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-        /* 如果你想完全像背景音樂，可以取消註解下面這行 */
-        /* display: none; */
       }
-
-      /* 歌單樣式 */
       .playlist {
         background: var(--card-bg);
         border-radius: 12px;
         padding: 10px;
         list-style: none;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
       }
-
       .song-item {
         display: flex;
         justify-content: space-between;
@@ -64,87 +48,69 @@
         margin: 5px 0;
         border-radius: 8px;
         cursor: pointer;
-        transition: all 0.2s ease;
+        transition: 0.2s;
         border-left: 4px solid transparent;
       }
-
       .song-item:hover {
         background: #2a2a2a;
-        transform: translateX(5px);
       }
-
       .song-item.active {
         background: #2a2a2a;
         border-left-color: var(--accent-color);
       }
-
-      .song-info .title {
-        display: block;
-        font-size: 1.1em;
-      }
-      .song-info .status {
+      .status {
         font-size: 0.8em;
         color: var(--text-dim);
-      }
-
-      .controls-hint {
-        margin-top: 20px;
-        color: var(--text-dim);
-        font-size: 0.9em;
       }
     </style>
   </head>
   <body>
     <div class="container">
       <h1>Music Station</h1>
-
-      <div id="player-wrapper">
-        <div id="player"></div>
-      </div>
-
+      <div id="player-wrapper"><div id="player"></div></div>
       <ul class="playlist" id="playlist"></ul>
-
-      <div class="controls-hint">
-        提示：點擊歌曲即可切換。支援自動播放下一首。
-      </div>
     </div>
 
     <script>
-      // 1. 你的歌單資料
       const songs = [
-        { title: "響念 Missing", videoId: "B5bQ355FA2o", start: 299, end: 507 },
-        { title: "Moon River", videoId: "B5bQ355FA2o", start: 3338, end: 3550 },
-        { title: "送給你的", videoId: "B5bQ355FA2o", start: 6938, end: 7236 },
+        { title: "響念 Missing", videoId: "B5bQ355FA2o", start: 299 },
+        { title: "Moon River", videoId: "B5bQ355FA2o", start: 3338 },
+        { title: "送給你的", videoId: "B5bQ355FA2o", start: 6938 },
       ];
 
       let player;
       let currentSongIndex = 0;
-      let isCorrecting = false; // 避免無限校準
+
+      // 【關鍵優化 1】: 使用載入 YouTube API 的無 Cookie 版本
+      var tag = document.createElement("script");
+      tag.src = "https://www.youtube-nocookie.com/iframe_api";
+      var firstScriptTag = document.getElementsByTagName("script")[0];
+      firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
 
       function onYouTubeIframeAPIReady() {
         player = new YT.Player("player", {
           height: "360",
           width: "100%",
-          // 初始化不給 videoId，防止一進網頁就撞廣告
+          // 初始化不設定影片，避免一進網頁就觸發廣告
           playerVars: {
             autoplay: 0,
             controls: 1,
-            rel: 0,
+            rel: 0, // 【關鍵優化 2】: 隱藏相關影片
+            modestbranding: 1, // 【關鍵優化 3】: 隱藏 Logo
+            iv_load_policy: 3, // 【關鍵優化 4】: 隱藏註解
             enablejsapi: 1,
             origin: window.location.origin,
-            iv_load_policy: 3, // 隱藏註解，減少廣告觸發
           },
           events: {
             onReady: onPlayerReady,
             onStateChange: onPlayerStateChange,
-            onError: onPlayerError,
           },
         });
       }
 
       function onPlayerReady() {
         renderPlaylist();
-        // 初始僅「預備」，不載入，降低廣告權限
+        // 使用 cue 而非 load，能有效降低廣告加載優先權
         player.cueVideoById({
           videoId: songs[0].videoId,
           startSeconds: songs[0].start,
@@ -152,67 +118,56 @@
       }
 
       function onPlayerStateChange(event) {
-        const song = songs[currentSongIndex];
-
-        // 當影片開始播放 (State 1)
-        if (event.data === YT.PlayerState.PLAYING) {
-          const currentTime = player.getCurrentTime();
-          // 【防廣告核心】偵測到時間跑掉（通常是廣告播完後跳回開頭）
-          if (Math.abs(currentTime - song.start) > 5 && !isCorrecting) {
-            isCorrecting = true;
-            console.log("偵測到廣告干擾或時間偏移，強制校準...");
-            player.mute(); // 靜音校準，避開廣告噪音
-            player.seekTo(song.start, true);
-
-            setTimeout(() => {
-              player.unMute();
-              isCorrecting = false;
-            }, 1000);
-          }
-        }
-
+        // 自動播放下一首邏輯
         if (event.data === YT.PlayerState.ENDED) {
           playNext();
+        }
+        // 偵測廣告後的自動回位
+        if (event.data === YT.PlayerState.PLAYING) {
+          const song = songs[currentSongIndex];
+          if (Math.abs(player.getCurrentTime() - song.start) > 5) {
+            player.seekTo(song.start, true);
+          }
         }
       }
 
       function playSong(index) {
         const song = songs[index];
         currentSongIndex = index;
+
+        // 【關鍵優化 5】: 同影片強制跳轉，絕對不執行重新載入
         const currentVideoId = player.getVideoData()
           ? player.getVideoData().video_id
           : null;
 
         if (song.videoId === currentVideoId) {
-          // 同影片跳轉：這是避開廣告的最強招式
+          console.log("偵測到同影片，執行無廣告跳轉");
           player.seekTo(song.start, true);
           player.playVideo();
         } else {
-          // 換片：先靜音，載入後自動校準
-          player.mute();
+          console.log("切換不同影片");
           player.loadVideoById({
             videoId: song.videoId,
             startSeconds: song.start,
           });
-          setTimeout(() => player.unMute(), 2000);
         }
         updateUI();
       }
 
-      // 5. 渲染與更新 UI
+      function playNext() {
+        currentSongIndex++;
+        if (currentSongIndex < songs.length) {
+          playSong(currentSongIndex);
+        }
+      }
+
       function renderPlaylist() {
         const listElement = document.getElementById("playlist");
         listElement.innerHTML = "";
-
         songs.forEach((song, index) => {
           const li = document.createElement("li");
           li.className = `song-item ${index === currentSongIndex ? "active" : ""}`;
-          li.innerHTML = `
-                    <div class="song-info">
-                        <span class="title">${song.title}</span>
-                        <span class="status">${index === currentSongIndex ? "正在播放" : "待播放"}</span>
-                    </div>
-                `;
+          li.innerHTML = `<div class="song-info"><span class="title">${song.title}</span><span class="status">${index === currentSongIndex ? "正在播放" : "待播放"}</span></div>`;
           li.onclick = () => playSong(index);
           listElement.appendChild(li);
         });
@@ -226,15 +181,6 @@
             index === currentSongIndex ? "正在播放" : "待播放";
         });
       }
-
-      function onPlayerError(e) {
-        console.error("播放發生錯誤，代碼：" + e.data);
-        if (e.data == 101 || e.data == 150) {
-          alert("抱歉，此影片因版權或嵌入限制無法播放。");
-        }
-      }
     </script>
-
-    <script src="https://www.youtube.com/iframe_api"></script>
   </body>
 </html>
