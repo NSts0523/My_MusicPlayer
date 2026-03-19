@@ -130,9 +130,8 @@
         player = new YT.Player("player", {
           height: "360",
           width: "100%", // 適應手機寬度
-          videoId: songs[0].videoId,
+          // videoId: songs[0].videoId,
           playerVars: {
-            autoplay: 1, // 自動播放
             controls: 1, // 顯示控制列（這有助於手動跳過廣告）
             rel: 0, // 不顯示相關影片
             enablejsapi: 1,
@@ -148,30 +147,43 @@
 
       function onPlayerReady() {
         renderPlaylist();
+        prepareSong(0);
       }
 
       // 3. 核心功能：自動播放下一首
-      function onPlayerStateChange(event) {
-        const song = songs[currentSongIndex];
+      // function onPlayerStateChange(event) {
+      //   const song = songs[currentSongIndex];
 
-        // 當使用者按下播放鍵，狀態變為 PLAYING (1) 時
-        if (event.data === YT.PlayerState.PLAYING) {
-          const currentTime = player.getCurrentTime();
+      //   // 當使用者按下播放鍵，狀態變為 PLAYING (1) 時
+      //   if (event.data === YT.PlayerState.PLAYING) {
+      //     const currentTime = player.getCurrentTime();
 
-          // 檢查目前秒數是否跟目標秒數差太多（例如超過 3 秒）
-          if (Math.abs(currentTime - song.start) > 3) {
-            console.log("偵測到時間偏移，執行手動校準...");
-            player.seekTo(song.start, true);
-          }
-        }
+      //     // 檢查目前秒數是否跟目標秒數差太多（例如超過 3 秒）
+      //     if (Math.abs(currentTime - song.start) > 3) {
+      //       console.log("偵測到時間偏移，執行手動校準...");
+      //       player.seekTo(song.start, true);
+      //     }
+      //   }
 
-        // 自動下一首邏輯（如果你選了手動播放，這部分可以保留或移除）
-        if (event.data === YT.PlayerState.ENDED) {
-          // 如果你希望播完這首就停下來，這裡就不要呼叫 playNext()
-          console.log("影片結束");
-        }
-      }
+      //   // 自動下一首邏輯（如果你選了手動播放，這部分可以保留或移除）
+      //   if (event.data === YT.PlayerState.ENDED) {
+      //     // 如果你希望播完這首就停下來，這裡就不要呼叫 playNext()
+      //     console.log("影片結束");
+      //   }
+      // }
+      // function prepareSong(index) {
+      //   currentSongIndex = index;
+      //   const song = songs[index];
 
+      //   // 使用 cueVideoById，這絕對不會自動播放
+      //   player.cueVideoById({
+      //     videoId: song.videoId,
+      //     startSeconds: song.start,
+      //   });
+
+      //   console.log(`已預備歌曲：${song.title}，請手動點擊播放器開始。`);
+      //   updateUI();
+      // }
       // 4. 播放指定歌曲
       function playSong(index) {
         const song = songs[index];
@@ -191,18 +203,12 @@
       // 5. 渲染與更新 UI
       function renderPlaylist() {
         const listElement = document.getElementById("playlist");
-        listElement.innerHTML = "";
-
         songs.forEach((song, index) => {
           const li = document.createElement("li");
-          li.className = `song-item ${index === currentSongIndex ? "active" : ""}`;
-          li.innerHTML = `
-                    <div class="song-info">
-                        <span class="title">${song.title}</span>
-                        <span class="status">${index === currentSongIndex ? "正在播放" : "待播放"}</span>
-                    </div>
-                `;
-          li.onclick = () => playSong(index);
+          li.className = "song-item";
+          li.innerText = song.title;
+          // 點擊後改為執行 prepareSong 而不是播放
+          li.onclick = () => prepareSong(index);
           listElement.appendChild(li);
         });
       }
