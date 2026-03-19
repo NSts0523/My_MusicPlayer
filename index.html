@@ -119,19 +119,20 @@
 
       let player;
       let currentSongIndex = 0;
+      let isCorrecting = false; // 避免無限校準
 
-      // 2. 初始化 YouTube API
       function onYouTubeIframeAPIReady() {
         player = new YT.Player("player", {
           height: "360",
-          width: "100%", // 適應手機寬度
-          // videoId: songs[0].videoId,
+          width: "100%",
+          // 初始化不給 videoId，防止一進網頁就撞廣告
           playerVars: {
             autoplay: 0,
             controls: 1,
             rel: 0,
             enablejsapi: 1,
-            origin: location.origin, // 解決 GitHub Pages 驗證問題
+            origin: window.location.origin,
+            iv_load_policy: 3, // 隱藏註解，減少廣告觸發
           },
           events: {
             onReady: onPlayerReady,
@@ -143,23 +144,30 @@
 
       function onPlayerReady() {
         renderPlaylist();
+        // 初始僅「預備」，不載入，降低廣告權限
         player.cueVideoById({
           videoId: songs[0].videoId,
           startSeconds: songs[0].start,
         });
       }
 
-      // 3. 核心功能：自動播放下一首
       function onPlayerStateChange(event) {
-        if (event.data === YT.PlayerState.PLAYING) {
-          const song = songs[currentSongIndex];
-          const currentTime = player.getCurrentTime();
+        const song = songs[currentSongIndex];
 
-          // 如果發現現在的時間點跟我們要聽的差太多 (超過 5 秒誤差)
-          // 通常是廣告播完後影片想跑回 0:00，我們強行把它拉回來
-          if (Math.abs(currentTime - song.start) > 5) {
-            console.log("偵測到時間偏移，強制校準中...");
+        // 當影片開始播放 (State 1)
+        if (event.data === YT.PlayerState.PLAYING) {
+          const currentTime = player.getCurrentTime();
+          // 【防廣告核心】偵測到時間跑掉（通常是廣告播完後跳回開頭）
+          if (Math.abs(currentTime - song.start) > 5 && !isCorrecting) {
+            isCorrecting = true;
+            console.log("偵測到廣告干擾或時間偏移，強制校準...");
+            player.mute(); // 靜音校準，避開廣告噪音
             player.seekTo(song.start, true);
+
+            setTimeout(() => {
+              player.unMute();
+              isCorrecting = false;
+            }, 1000);
           }
         }
 
@@ -168,37 +176,25 @@
         }
       }
 
-      function playNext() {
-        currentSongIndex++;
-        if (currentSongIndex < songs.length) {
-          playSong(currentSongIndex);
-        } else {
-          console.log("歌單已播放完畢");
-        }
-      }
-
-      // 4. 播放指定歌曲
       function playSong(index) {
         const song = songs[index];
         currentSongIndex = index;
-
-        // 取得目前播放器內的影片 ID
         const currentVideoId = player.getVideoData()
           ? player.getVideoData().video_id
           : null;
 
         if (song.videoId === currentVideoId) {
-          // [關鍵] 同一個直播檔：直接跳轉秒數，不重新載入
-          console.log("同影片跳轉中...");
+          // 同影片跳轉：這是避開廣告的最強招式
           player.seekTo(song.start, true);
           player.playVideo();
         } else {
-          // 不同影片：才需要重新載入
-          console.log("切換新影片中...");
+          // 換片：先靜音，載入後自動校準
+          player.mute();
           player.loadVideoById({
             videoId: song.videoId,
             startSeconds: song.start,
           });
+          setTimeout(() => player.unMute(), 2000);
         }
         updateUI();
       }
