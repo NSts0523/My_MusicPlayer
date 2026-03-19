@@ -172,25 +172,34 @@
         const song = songs[index];
         currentSongIndex = index;
 
-        // 取得目前播放器內的影片 ID
-        const currentVideoId = player.getVideoData()
-          ? player.getVideoData().video_id
-          : null;
+        console.log(`準備播放：${song.title}，目標秒數：${song.start}`);
 
-        if (song.videoId === currentVideoId) {
-          // [關鍵] 同一個直播檔：直接跳轉秒數，不重新載入
-          console.log("同影片跳轉中...");
-          player.seekTo(song.start, true);
-          player.playVideo();
-        } else {
-          // 不同影片：才需要重新載入
-          console.log("切換新影片中...");
-          player.loadVideoById({
-            videoId: song.videoId,
-            startSeconds: song.start,
-          });
-        }
+        // 1. 強制執行載入
+        player.loadVideoById({
+          videoId: song.videoId,
+          startSeconds: song.start,
+        });
+
+        // 2. [保險機制] 監控播放狀態，防止跳轉失效
+        // 有些廣告會洗掉 startSeconds，我們在影片真正開始播 (State 1) 時再校對一次
+        const checkJump = setInterval(() => {
+          const state = player.getPlayerState();
+          const currentTime = player.getCurrentTime();
+
+          // 如果影片開始播了，但時間點跟目標差太多 (超過 5 秒誤差)
+          if (state === 1 && Math.abs(currentTime - song.start) > 5) {
+            console.log("偵測到跳轉失效，執行二次強制跳轉...");
+            player.seekTo(song.start, true);
+            clearInterval(checkJump); // 校對完成，清除計時器
+          }
+
+          // 如果播了 10 秒還沒校對成功，也清除計時器避免無限循環
+        }, 500);
+
+        setTimeout(() => clearInterval(checkJump), 10000);
+
         updateUI();
+        startProgessTimer(); // 啟動你之前寫的自動結束偵測
       }
       // 5. 渲染與更新 UI
       function renderPlaylist() {
