@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Music Station | 靜態載入版</title>
+    <title>Music Station | 修正版</title>
     <style>
       :root {
         --bg-color: #0f0f0f;
@@ -36,7 +36,6 @@
         overflow: hidden;
         margin-bottom: 30px;
       }
-      /* 直接對 iframe 進行樣式控制 */
       #player {
         position: absolute;
         top: 0;
@@ -72,12 +71,7 @@
     <div class="container">
       <h1>Music Station</h1>
       <div class="video-container">
-        <iframe
-          id="player"
-          src="https://www.youtube-nocookie.com/embed/B5bQ355FA2o?enablejsapi=1&modestbranding=1&rel=0&iv_load_policy=3"
-          allow="autoplay; encrypted-media"
-          allowfullscreen
-        ></iframe>
+        <div id="player"></div>
       </div>
       <ul class="playlist" id="playlist"></ul>
     </div>
@@ -90,10 +84,23 @@
       ];
       window.player = null;
       window.currentSongIndex = 0;
+      let isInitialLoad = true;
 
-      // 當 API 準備好後，直接綁定到現有的 iframe
+      // API 準備好後的初始化
       window.onYouTubeIframeAPIReady = function () {
         window.player = new YT.Player("player", {
+          height: "100%",
+          width: "100%",
+          videoId: window.songs[0].videoId,
+          host: "https://www.youtube-nocookie.com", // 減少追蹤與部分廣告
+          playerVars: {
+            autoplay: 0,
+            controls: 1,
+            modestbranding: 1,
+            rel: 0,
+            iv_load_policy: 3,
+            start: window.songs[0].start,
+          },
           events: {
             onReady: window.onPlayerReady,
             onStateChange: window.onPlayerStateChange,
@@ -106,25 +113,29 @@
       };
 
       window.onPlayerStateChange = function (event) {
-        if (event.data === YT.PlayerState.ENDED) playNext();
-        // 廣告後校準：如果時間跑掉則強制 seekTo
-        if (event.data === YT.PlayerState.PLAYING) {
+        // 影片結束自動下一首
+        if (event.data === YT.PlayerState.ENDED) {
+          window.playNext();
+        }
+
+        // 修正廣告後的定位問題
+        if (event.data === YT.PlayerState.PLAYING && isInitialLoad) {
           const song = window.songs[window.currentSongIndex];
-          if (Math.abs(window.player.getCurrentTime() - song.start) > 5) {
-            window.player.seekTo(song.start, true);
-          }
+          window.player.seekTo(song.start, true);
+          isInitialLoad = false; // 確保只在切換歌曲後第一次播放時校準
         }
       };
 
       window.playSong = function (index) {
         window.currentSongIndex = index;
         const song = window.songs[index];
-        const currentId = window.player.getVideoData()
-          ? window.player.getVideoData().video_id
-          : null;
+        isInitialLoad = true; // 標記為需要重新定位
+
+        // 判斷是否為同影片
+        const videoData = window.player.getVideoData();
+        const currentId = videoData ? videoData.video_id : null;
 
         if (song.videoId === currentId) {
-          // 同影片跳轉優化
           window.player.seekTo(song.start, true);
           window.player.playVideo();
         } else {
@@ -149,10 +160,11 @@
       };
 
       window.playNext = function () {
-        if (window.currentSongIndex < window.songs.length - 1)
+        if (window.currentSongIndex < window.songs.length - 1) {
           window.playSong(window.currentSongIndex + 1);
+        }
       };
     </script>
-    <script src="https://www.youtube-nocookie.com/iframe_api"></script>
+    <script src="https://www.youtube.com/iframe_api"></script>
   </body>
 </html>
