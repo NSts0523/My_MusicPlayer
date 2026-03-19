@@ -151,39 +151,39 @@
       }
 
       // 3. 核心功能：自動播放下一首
-      // function onPlayerStateChange(event) {
-      //   const song = songs[currentSongIndex];
+      function onPlayerStateChange(event) {
+        const song = songs[currentSongIndex];
 
-      //   // 當使用者按下播放鍵，狀態變為 PLAYING (1) 時
-      //   if (event.data === YT.PlayerState.PLAYING) {
-      //     const currentTime = player.getCurrentTime();
+        // 當使用者按下播放鍵，狀態變為 PLAYING (1) 時
+        if (event.data === YT.PlayerState.PLAYING) {
+          const currentTime = player.getCurrentTime();
 
-      //     // 檢查目前秒數是否跟目標秒數差太多（例如超過 3 秒）
-      //     if (Math.abs(currentTime - song.start) > 3) {
-      //       console.log("偵測到時間偏移，執行手動校準...");
-      //       player.seekTo(song.start, true);
-      //     }
-      //   }
+          // 檢查目前秒數是否跟目標秒數差太多（例如超過 3 秒）
+          if (Math.abs(currentTime - song.start) > 3) {
+            console.log("偵測到時間偏移，執行手動校準...");
+            player.seekTo(song.start, true);
+          }
+        }
 
-      //   // 自動下一首邏輯（如果你選了手動播放，這部分可以保留或移除）
-      //   if (event.data === YT.PlayerState.ENDED) {
-      //     // 如果你希望播完這首就停下來，這裡就不要呼叫 playNext()
-      //     console.log("影片結束");
-      //   }
-      // }
-      // function prepareSong(index) {
-      //   currentSongIndex = index;
-      //   const song = songs[index];
+        // 自動下一首邏輯（如果你選了手動播放，這部分可以保留或移除）
+        if (event.data === YT.PlayerState.ENDED) {
+          // 如果你希望播完這首就停下來，這裡就不要呼叫 playNext()
+          console.log("影片結束");
+        }
+      }
+      function prepareSong(index) {
+        currentSongIndex = index;
+        const song = songs[index];
 
-      //   // 使用 cueVideoById，這絕對不會自動播放
-      //   player.cueVideoById({
-      //     videoId: song.videoId,
-      //     startSeconds: song.start,
-      //   });
+        // 使用 cueVideoById，這絕對不會自動播放
+        player.cueVideoById({
+          videoId: song.videoId,
+          startSeconds: song.start,
+        });
 
-      //   console.log(`已預備歌曲：${song.title}，請手動點擊播放器開始。`);
-      //   updateUI();
-      // }
+        console.log(`已預備歌曲：${song.title}，請手動點擊播放器開始。`);
+        updateUI();
+      }
       // 4. 播放指定歌曲
       function playSong(index) {
         const song = songs[index];
