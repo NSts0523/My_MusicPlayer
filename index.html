@@ -1,0 +1,117 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>我的音樂播放器</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        background: #121212;
+        color: white;
+        text-align: center;
+        padding: 20px;
+      }
+      .playlist {
+        list-style: none;
+        padding: 0;
+        max-width: 500px;
+        margin: 20px auto;
+      }
+      .song-item {
+        cursor: pointer;
+        padding: 15px;
+        border-bottom: 1px solid #333;
+        transition: 0.3s;
+      }
+      .song-item:hover {
+        background: #222;
+        color: #ff0000;
+      }
+      #player-container {
+        margin-bottom: 20px;
+        background: #000;
+        display: inline-block;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>音樂播放器 (YouTube API)</h2>
+
+    <div id="player-container">
+      <div id="player"></div>
+    </div>
+
+    <ul class="playlist" id="playlist"></ul>
+
+    <script>
+      const songs = [
+        {
+          title: "第一首歌曲",
+          videoId: "SXZ29NGaFFMA", // 確保這個 ID 是有效的
+          start: 0,
+        },
+      ];
+
+      let player;
+
+      // 當 API 準備好時會自動執行
+      function onYouTubeIframeAPIReady() {
+        console.log("YouTube API Ready");
+        player = new YT.Player("player", {
+          height: "360",
+          width: "640",
+          videoId: songs[0].videoId,
+          playerVars: {
+            autoplay: 0,
+            controls: 1,
+            rel: 0,
+            enablejsapi: 1,
+          },
+          events: {
+            onReady: onPlayerReady,
+            onError: onPlayerError,
+          },
+        });
+      }
+
+      function onPlayerReady(event) {
+        console.log("Player is Ready");
+        renderPlaylist();
+      }
+
+      function onPlayerError(event) {
+        const errorMap = {
+          2: "無效的參數",
+          5: "HTML5 播放器錯誤",
+          100: "影片不存在或已設為私人",
+          101: "此影片不允許嵌入播放",
+          150: "此影片不允許嵌入播放",
+        };
+        alert("播放器錯誤: " + (errorMap[event.data] || "未知錯誤"));
+      }
+
+      function renderPlaylist() {
+        const listElement = document.getElementById("playlist");
+        listElement.innerHTML = ""; // 清空舊內容
+        songs.forEach((song) => {
+          const li = document.createElement("li");
+          li.className = "song-item";
+          li.innerText = song.title;
+          li.onclick = () => playSong(song);
+          listElement.appendChild(li);
+        });
+      }
+
+      function playSong(song) {
+        if (player && player.loadVideoById) {
+          player.loadVideoById({
+            videoId: song.videoId,
+            startSeconds: song.start,
+          });
+        }
+      }
+    </script>
+
+    <script src="https://www.youtube.com/iframe_api"></script>
+  </body>
+</html>
